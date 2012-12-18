@@ -50,3 +50,5 @@ Only basic html tags are supported right now. However, it should not be to diffi
 ..to Ben Woosley for his improvements to the first version.
 
 ..to Harlan T. Wood for his help with the newer versions.
+
+..to Tomek Mańko for his table parsing code

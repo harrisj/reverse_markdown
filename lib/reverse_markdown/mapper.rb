@@ -4,12 +4,18 @@ module ReverseMarkdown
     attr_accessor :log_enabled, :log_level
     attr_accessor :li_counter
     attr_accessor :github_style_code_blocks
+    attr_accessor :theaders
+    attr_accessor :taligns
+    attr_accessor :new_table
 
     def initialize(opts={})
       self.log_level   = :info
       self.log_enabled = true
       self.li_counter  = 0
       self.github_style_code_blocks = opts[:github_style_code_blocks] || false
+      self.taligns = []
+      self.theaders = 0
+      self.new_table = :no # :yes, :no, :thead
     end
 
     def process_root(element)
@@ -87,6 +93,55 @@ module ReverseMarkdown
           else
             "#{indent}- "
           end
+        when :table
+          self.new_table = :yes
+          "\n\n"
+        when :thead # && 
+          # puts "thead"
+          self.new_table = :thead
+          if parent == :table
+            self.taligns = []
+            self.theaders = 0
+            '| '
+          else
+            ''
+          end
+        when :tbody
+          # puts "tbody"
+          self.new_table = :yes unless self.new_table == :thead
+          ''
+        # when :tr
+        #   self.trow = []
+        # when :td, :th
+        #   if self.trow == []
+        #     trow << element.name.to_sym << sel
+        when :tr
+          if parent == :thead
+            if (self.theaders += 1) > 1
+              handle_error "malformed table header"
+            end
+            ''
+          elsif parent == :tbody
+            #binding.pry
+            str = ''
+            if self.theaders == 0 && self.new_table == :yes then
+              self.new_table = :no
+              children = element.children.select { |el| ['td','th'].include? el.name }
+              fill = lambda do |with|
+                children.flat_map do |el|
+                  cs = el['colspan']
+                  [with] * ((cs && cs.to_i) || 1)
+                end
+              end
+              str  = "|#{fill.call('   ').join('|')}|\n"
+              str += "|#{fill.call('---').join('|')}|\n"
+            end
+            # binding.pry
+            str += '| '
+          end
+        when :th
+          self.taligns << (element['align'] || :left).to_sym
+          ''          
         when :pre
           "\n"
         when :ol
@@ -148,10 +203,31 @@ module ReverseMarkdown
       case element.name.to_sym
         when :html, :body, :pre, :hr
           ""
+        when :th, :td
+          ' |'
+        when :tr
+          "\n"
         when :p
           "\n\n"
         when :div
           "\n"
+        when :table
+          "\n"          
+        when :thead
+          if parent == :table
+            (['|'].concat(self.taligns.map do |align|
+              case align
+                when :left
+                  '---|'
+                when :center
+                  ':-:|'
+                when :right
+                  '--:|'
+              end
+            end) << "\n").join('')
+          else
+            ''
+          end
         when :h1, :h2, :h3, :h4 # /h(\d)/ for 1.9
           "\n"
         when :em, :i
